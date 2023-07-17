@@ -58,7 +58,7 @@ public:
 
             std::cout << std::to_string(*ip_part);
         }
-        std::cout << std::endl;
+        std::cout << '\n'; // '\n' вместо std::endl для совместимости "протокола" вывода с windows
     }
 
     template<typename... Args>
