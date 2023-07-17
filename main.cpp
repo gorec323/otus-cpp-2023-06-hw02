@@ -3,6 +3,9 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <array>
+#include <algorithm>
+#include <tuple>
 
 // ("",  '.') -> [""]
 // ("11", '.') -> ["11"]
@@ -10,52 +13,119 @@
 // ("11.", '.') -> ["11", ""]
 // (".11", '.') -> ["", "11"]
 // ("11.22", '.') -> ["11", "22"]
-std::vector<std::string> split(const std::string &str, char d)
+std::vector<std::string> split(const std::string &str, char delimitter)
 {
-    std::vector<std::string> r;
+    std::vector<std::string> result;
 
     std::string::size_type start = 0;
-    std::string::size_type stop = str.find_first_of(d);
+    auto stop = str.find_first_of(delimitter);
     while(stop != std::string::npos)
     {
-        r.push_back(str.substr(start, stop - start));
+        result.push_back(str.substr(start, stop - start));
 
         start = stop + 1;
-        stop = str.find_first_of(d, start);
+        stop = str.find_first_of(delimitter, start);
     }
 
-    r.push_back(str.substr(start));
+    result.push_back(str.substr(start));
 
-    return r;
+    return result;
 }
+
+class IpAddr
+{
+public:
+    IpAddr(std::vector<std::string> &&parts)
+    {
+        std::transform(parts.cbegin(), parts.cend(), m_ipParts.begin(), [](const std::string &strPart)
+        {
+            return static_cast<std::uint8_t>(std::stoul(strPart));
+        });
+    }
+
+    ~IpAddr() = default;
+
+    bool operator>(const IpAddr &other) const noexcept
+    {
+        return (toU32() > other.toU32());
+    }
+
+    void print() const noexcept
+    {
+        for (auto ip_part = m_ipParts.cbegin(); ip_part != m_ipParts.cend(); ++ip_part) {
+            if (ip_part != m_ipParts.cbegin())
+                std::cout << ".";
+
+            std::cout << std::to_string(*ip_part);
+        }
+        std::cout << '\n'; // '\n' вместо std::endl для совместимости "протокола" вывода с windows
+    }
+
+    template<typename... Args>
+    inline bool filter(Args... flt) const
+    {
+        return filter_impl(m_ipParts.cbegin(), flt...);
+    }
+
+    inline bool filter_any(std::uint8_t flt) const
+    {
+        return std::any_of(m_ipParts.cbegin(), m_ipParts.cend(),
+                           [flt](std::uint8_t v)
+        {
+            return v == flt;
+        });
+    }
+
+private:
+    template<typename ItrerType>
+    bool filter_impl(ItrerType) const
+    {
+        return false;
+    }
+
+    template<typename ItrerType , typename T, typename... Args>
+    bool filter_impl(ItrerType it, T v, Args... flt) const
+    {
+        if (it == m_ipParts.cend())
+            return true; // дошли до конца адреса
+
+        if (*it != v)
+            return false;
+
+        if (sizeof...(flt) == 0)
+            return true;
+
+        return filter_impl(++it, flt...);
+
+    }
+
+    inline std::uint32_t toU32() const noexcept
+    {
+        return static_cast<std::uint32_t>(m_ipParts[0]) << 24
+                | static_cast<std::uint32_t>(m_ipParts[1]) << 16
+                | static_cast<std::uint32_t>(m_ipParts[2]) << 8
+                | m_ipParts[3];
+    }
+
+    std::array<std::uint8_t, 4> m_ipParts;
+};
 
 int main(int argc, char const *argv[])
 {
-    try
-    {
-        std::vector<std::vector<std::string> > ip_pool;
+    try {
+        std::vector<IpAddr> ip_pool;
 
-        for(std::string line; std::getline(std::cin, line);)
-        {
+        for (std::string line; std::getline(std::cin, line);) {
             std::vector<std::string> v = split(line, '\t');
             ip_pool.push_back(split(v.at(0), '.'));
         }
 
-        // TODO reverse lexicographically sort
+        // reverse lexicographically sort
 
-        for(std::vector<std::vector<std::string> >::const_iterator ip = ip_pool.cbegin(); ip != ip_pool.cend(); ++ip)
-        {
-            for(std::vector<std::string>::const_iterator ip_part = ip->cbegin(); ip_part != ip->cend(); ++ip_part)
-            {
-                if (ip_part != ip->cbegin())
-                {
-                    std::cout << ".";
+        std::sort(ip_pool.begin(), ip_pool.end(), std::greater<IpAddr>());
 
-                }
-                std::cout << *ip_part;
-            }
-            std::cout << std::endl;
-        }
+        for(auto &&ip : ip_pool)
+            ip.print();
 
         // 222.173.235.246
         // 222.130.177.64
@@ -64,6 +134,12 @@ int main(int argc, char const *argv[])
         // 1.70.44.170
         // 1.29.168.152
         // 1.1.234.8
+
+        for(auto &&ip : ip_pool) {
+            if (ip.filter(1u))
+                ip.print();
+        }
+
 
         // TODO filter by first byte and output
         // ip = filter(1)
@@ -77,6 +153,12 @@ int main(int argc, char const *argv[])
         // TODO filter by first and second bytes and output
         // ip = filter(46, 70)
 
+        for(auto &&ip : ip_pool) {
+            if (ip.filter(46u, 70u))
+                ip.print();
+        }
+
+
         // 46.70.225.39
         // 46.70.147.26
         // 46.70.113.73
@@ -84,6 +166,11 @@ int main(int argc, char const *argv[])
 
         // TODO filter by any byte and output
         // ip = filter_any(46)
+
+        for (auto &&ip : ip_pool) {
+            if (ip.filter_any(46u))
+                ip.print();
+        }
 
         // 186.204.34.46
         // 186.46.222.194
@@ -119,9 +206,7 @@ int main(int argc, char const *argv[])
         // 46.49.43.85
         // 39.46.86.85
         // 5.189.203.46
-    }
-    catch(const std::exception &e)
-    {
+    } catch (const std::exception &e) {
         std::cerr << e.what() << std::endl;
     }
 
