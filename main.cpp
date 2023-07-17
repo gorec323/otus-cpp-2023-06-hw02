@@ -5,6 +5,7 @@
 #include <vector>
 #include <array>
 #include <algorithm>
+#include <tuple>
 
 // ("",  '.') -> [""]
 // ("11", '.') -> ["11"]
@@ -60,7 +61,44 @@ public:
         std::cout << std::endl;
     }
 
+    template<typename... Args>
+    inline bool filter(Args... flt) const
+    {
+        return filter_impl(m_ipParts.cbegin(), flt...);
+    }
+
+    inline bool filter_any(std::uint8_t flt) const
+    {
+        return std::any_of(m_ipParts.cbegin(), m_ipParts.cend(),
+                           [flt](std::uint8_t v)
+        {
+            return v == flt;
+        });
+    }
+
 private:
+    template<typename ItrerType>
+    bool filter_impl(ItrerType) const
+    {
+        return false;
+    }
+
+    template<typename ItrerType , typename T, typename... Args>
+    bool filter_impl(ItrerType it, T v, Args... flt) const
+    {
+        if (it == m_ipParts.cend())
+            return true; // дошли до конца адреса
+
+        if (*it != v)
+            return false;
+
+        if (sizeof...(flt) == 0)
+            return true;
+
+        return filter_impl(++it, flt...);
+
+    }
+
     inline std::uint32_t toU32() const noexcept
     {
         return static_cast<std::uint32_t>(m_ipParts[0]) << 24
@@ -71,7 +109,6 @@ private:
 
     std::array<std::uint8_t, 4> m_ipParts;
 };
-
 
 int main(int argc, char const *argv[])
 {
@@ -98,6 +135,12 @@ int main(int argc, char const *argv[])
         // 1.29.168.152
         // 1.1.234.8
 
+        for(auto &&ip : ip_pool) {
+            if (ip.filter(1u))
+                ip.print();
+        }
+
+
         // TODO filter by first byte and output
         // ip = filter(1)
 
@@ -110,6 +153,12 @@ int main(int argc, char const *argv[])
         // TODO filter by first and second bytes and output
         // ip = filter(46, 70)
 
+        for(auto &&ip : ip_pool) {
+            if (ip.filter(46u, 70u))
+                ip.print();
+        }
+
+
         // 46.70.225.39
         // 46.70.147.26
         // 46.70.113.73
@@ -117,6 +166,11 @@ int main(int argc, char const *argv[])
 
         // TODO filter by any byte and output
         // ip = filter_any(46)
+
+        for (auto &&ip : ip_pool) {
+            if (ip.filter_any(46u))
+                ip.print();
+        }
 
         // 186.204.34.46
         // 186.46.222.194
