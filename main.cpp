@@ -152,9 +152,7 @@ int main(int argc, char const *argv[])
         // 46.49.43.85
         // 39.46.86.85
         // 5.189.203.46
-    }
-    catch(const std::exception &e)
-    {
+    } catch (const std::exception &e) {
         std::cerr << e.what() << std::endl;
     }
 
